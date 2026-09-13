@@ -32,7 +32,8 @@ else
   echo "[CREPA] src/index.js exists - checking for updates..."
   if [[ -d .git ]] && [[ "1" == "1" ]]; then
     echo "[CREPA] Pulling latest..."
-    git pull || echo "[CREPA] git pull failed"
+    # استعمل fetch + reset لتجاوز تعارض الملفات غير المتتبعة (مثل start.sh الذي رفعناه يدوياً)
+    git fetch origin && git reset --hard origin/main || echo "[CREPA] git pull failed"
   fi
 fi
 
