@@ -1,8 +1,10 @@
 #!/bin/bash
+set -x
 cd /home/container
-echo "[CREPA] Starting setup..."
+echo "[CREPA] Starting setup... Node $(node -v) | $(date)"
+echo "[CREPA] start.sh version 75b36aa-v2"
 
-# Fix flat file structure from previous incorrect upload
+# Fix flat file structure
 if [[ -f AutoReactionManager.js ]] || [[ -f config.js && ! -f src/config.js ]]; then
   echo "[CREPA] Detected flat file structure - fixing..."
   rm -f AutoReactionManager.js autoReactions.json autoreaction.js commandHandler.js config.js deploy-commands.js eventHandler.js index.js interactionCreate.js logger.js messageCreate.js ready.js 2>/dev/null
@@ -10,77 +12,59 @@ if [[ -f AutoReactionManager.js ]] || [[ -f config.js && ! -f src/config.js ]]; 
   echo "[CREPA] Cleaned flat files"
 fi
 
-# Clone from GitHub if src/index.js doesn't exist
+# Clone or pull
 if [[ ! -f src/index.js ]]; then
-  echo "[CREPA] src/index.js not found - cloning from GitHub..."
+  echo "[CREPA] src/index.js not found - cloning..."
   rm -rf /tmp/clone
-  git clone https://github.com/bensaedis-commits/CREPA_Bot.git /tmp/clone
-  if [[ $? -eq 0 ]]; then
-    echo "[CREPA] Clone success, copying files..."
-    cp -r /tmp/clone/* /home/container/ 2>/dev/null
-    cp -r /tmp/clone/.git /home/container/ 2>/dev/null || true
-    # Also copy hidden files like .env.example if needed (but not .env)
-    cp /tmp/clone/.env.example /home/container/ 2>/dev/null || true
-    cp /tmp/clone/.gitignore /home/container/ 2>/dev/null || true
-    rm -rf /tmp/clone
-    echo "[CREPA] Copy complete"
-    ls -la src/ 2>&1 | head -20
-  else
-    echo "[CREPA] Clone failed!"
-  fi
+  git clone https://github.com/bensaedis-commits/CREPA_Bot.git /tmp/clone && cp -r /tmp/clone/* /home/container/ && cp -r /tmp/clone/.git /home/container/ 2>/dev/null; cp /tmp/clone/.env.example /home/container/ 2>/dev/null; rm -rf /tmp/clone; echo "[CREPA] Clone done"; ls -la src/ | head -20
 else
-  echo "[CREPA] src/index.js exists - checking for updates..."
-  if [[ -d .git ]] && [[ "1" == "1" ]]; then
-    echo "[CREPA] Pulling latest..."
-    # استعمل fetch + reset لتجاوز تعارض الملفات غير المتتبعة (مثل start.sh الذي رفعناه يدوياً)
-    git fetch origin && git reset --hard origin/main || echo "[CREPA] git pull failed"
+  echo "[CREPA] src/index.js exists - pulling..."
+  if [[ -d .git ]]; then
+    git fetch origin && git reset --hard origin/main && echo "[CREPA] Pull done - $(git log --oneline -1)" || echo "[CREPA] Pull failed"
   fi
 fi
 
-# Install dependencies
+echo "[CREPA] Files after pull:"
+ls -la | head -30
+ls -la src/ | head -30
+
+# Install
 if [ -f package.json ]; then
-  echo "[CREPA] Installing dependencies..."
-  npm install
+  echo "[CREPA] npm install..."
+  npm install --loglevel=error 2>&1 | tail -20
+  echo "[CREPA] npm done"
 fi
 
-# Deploy commands if needed (optional)
+# Check .env
+echo "[CREPA] .env check:"
+if [[ -f .env ]]; then
+  echo "[CREPA] .env exists - size $(wc -c < .env) bytes"
+  cat .env | sed 's/DISCORD_TOKEN=.*/DISCORD_TOKEN=***/' | head -5
+  echo "[CREPA] .env first line check:"
+  head -1 .env | cat -A
+else
+  echo "[CREPA] .env MISSING!"
+  ls -la .env* 2>&1
+fi
+
+# Check config.json
+echo "[CREPA] config.json check:"
+cat config.json | head -20 2>&1 || echo "No config.json"
+echo "[CREPA] Node version: $(node -v) | NPM: $(npm -v)"
+
+# Deploy
 if [ -f src/deploy-commands.js ]; then
   echo "[CREPA] Deploying commands..."
-  node src/deploy-commands.js 2>&1 || echo "[CREPA] Deploy failed (maybe token not yet set)"
+  node src/deploy-commands.js 2>&1 || echo "[CREPA] Deploy failed"
 fi
 
-# Check .env exists
-if [[ ! -f .env ]]; then
-  echo "[CREPA] ERROR: .env not found! Creating from example..."
-  if [[ -f .env.example ]]; then
-    cp .env.example .env
-    echo "[CREPA] Created .env from example - PLEASE SET TOKEN!"
-  fi
-fi
-echo "[CREPA] .env check:"
-cat .env | sed 's/DISCORD_TOKEN=.*/DISCORD_TOKEN=***/' | head -5
-
-# Run bot with auto-restart on crash
+# Run bot
+echo "[CREPA] Starting bot..."
 if [ -f src/index.js ]; then
-  echo "[CREPA] Starting bot from src/index.js (Node $(node -v))"
-  # Loop to restart on crash
-  while true; do
-    node src/index.js
-    EXIT_CODE=$?
-    echo "[CREPA] Bot exited with code $EXIT_CODE - restarting in 5s..."
-    sleep 5
-  done
-elif [ -f index.js ]; then
-  echo "[CREPA] Starting bot from index.js"
-  while true; do
-    node index.js
-    EXIT_CODE=$?
-    echo "[CREPA] Bot exited with code $EXIT_CODE - restarting in 5s..."
-    sleep 5
-  done
+  echo "[CREPA] Executing: node src/index.js"
+  exec node src/index.js
 else
-  echo "[CREPA] ERROR: No entry file found!"
-  ls -la
-  ls -la src/ 2>&1 || echo "No src"
+  echo "[CREPA] No src/index.js!"
+  ls -la src/ 2>&1
   exit 1
 fi
