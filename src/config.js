@@ -14,15 +14,18 @@ const config = {
     warning: 0xFEE75C,
   },
 
-  // التحقق من المتغيرات المطلوبة
+  // التحقق من المتغيرات المطلوبة - محسن
   validate() {
     const missing = [];
-    if (!this.token) missing.push('DISCORD_TOKEN');
+    if (!this.token || this.token.trim().length < 50) missing.push('DISCORD_TOKEN (invalid or missing)');
     if (!this.clientId) missing.push('CLIENT_ID');
-    // GUILD_ID اختياري - إذا لم يوجد ستنشر الأوامر Globally
     if (missing.length > 0) {
+      console.error('[CONFIG] Missing env:', missing.join(', '));
+      console.error('[CONFIG] Check .env file exists and has correct values');
       throw new Error(`Missing required env variables: ${missing.join(', ')}`);
     }
+    // تنظيف التوكن من المسافات
+    this.token = this.token.trim();
   },
 };
 

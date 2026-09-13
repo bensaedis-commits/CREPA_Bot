@@ -33,16 +33,22 @@ module.exports = {
     // لا يوجد شيء للتفاعل به
     if (toReact.size === 0) return;
 
-    // تنفيذ الريأكشنات بالتتالي لتجنب Rate Limit
-    for (const emoji of toReact) {
+    // تنفيذ الريأكشنات بشكل متوازي وسريع مع معالجة الأخطاء
+    const promises = Array.from(toReact).map(async (emoji) => {
       try {
         await message.react(emoji);
-        logger.debug(`[AutoReaction] Reacted ${emoji} on msg ${message.id} (author:${message.author.id})`);
+        logger.debug(`[AutoReaction] Reacted ${emoji} on msg ${message.id}`);
       } catch (err) {
-        // أخطاء شائعة: إيموجي غير موجود، البوت لا يملك صلاحية، إيموجي من سيرفر لا يتواجد فيه البوت
-        logger.warn(`[AutoReaction] Failed to react ${emoji} on msg ${message.id}: ${err.message} (code:${err.code})`);
-        // لا نوقف الحلقة - نحاول باقي الإيموجيات
+        // تجاهل أخطاء الريأكشن المكرر أو الإيموجي غير الصالح
+        if (err.code === 30010) {
+          logger.warn(`[AutoReaction] Max reactions reached on ${message.id}`);
+        } else if (err.code === 10014) {
+          logger.warn(`[AutoReaction] Unknown emoji ${emoji} - check if bot is in emoji server`);
+        } else if (err.code !== 90001) { // تجاهل already reacted
+          logger.warn(`[AutoReaction] Failed ${emoji} on ${message.id}: ${err.message} (code:${err.code})`);
+        }
       }
-    }
+    });
+    await Promise.all(promises);
   },
 };

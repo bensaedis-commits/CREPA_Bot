@@ -14,12 +14,19 @@ function loadEvents(client) {
       logger.warn(`[EventHandler] Skipping invalid event file: ${file}`);
       continue;
     }
-    if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args, client));
-    } else {
-      client.on(event.name, (...args) => event.execute(...args, client));
+    const register = (name) => {
+      if (event.once) {
+        client.once(name, (...args) => event.execute(...args, client));
+      } else {
+        client.on(name, (...args) => event.execute(...args, client));
+      }
+    };
+    register(event.name);
+    // دعم الاسم البديل (ready <-> clientReady) للتوافق
+    if (event.alternateName) {
+      register(event.alternateName);
     }
-    logger.info(`[EventHandler] Loaded event: ${event.name}`);
+    logger.info(`[EventHandler] Loaded event: ${event.name}${event.alternateName ? ` (+${event.alternateName})` : ''}`);
   }
 }
 

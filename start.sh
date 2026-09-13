@@ -49,13 +49,35 @@ if [ -f src/deploy-commands.js ]; then
   node src/deploy-commands.js 2>&1 || echo "[CREPA] Deploy failed (maybe token not yet set)"
 fi
 
-# Run bot
+# Check .env exists
+if [[ ! -f .env ]]; then
+  echo "[CREPA] ERROR: .env not found! Creating from example..."
+  if [[ -f .env.example ]]; then
+    cp .env.example .env
+    echo "[CREPA] Created .env from example - PLEASE SET TOKEN!"
+  fi
+fi
+echo "[CREPA] .env check:"
+cat .env | sed 's/DISCORD_TOKEN=.*/DISCORD_TOKEN=***/' | head -5
+
+# Run bot with auto-restart on crash
 if [ -f src/index.js ]; then
-  echo "[CREPA] Starting bot from src/index.js"
-  node src/index.js
+  echo "[CREPA] Starting bot from src/index.js (Node $(node -v))"
+  # Loop to restart on crash
+  while true; do
+    node src/index.js
+    EXIT_CODE=$?
+    echo "[CREPA] Bot exited with code $EXIT_CODE - restarting in 5s..."
+    sleep 5
+  done
 elif [ -f index.js ]; then
   echo "[CREPA] Starting bot from index.js"
-  node index.js
+  while true; do
+    node index.js
+    EXIT_CODE=$?
+    echo "[CREPA] Bot exited with code $EXIT_CODE - restarting in 5s..."
+    sleep 5
+  done
 else
   echo "[CREPA] ERROR: No entry file found!"
   ls -la
