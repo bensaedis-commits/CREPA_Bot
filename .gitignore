@@ -1,0 +1,7 @@
+node_modules/
+.env
+# نحتفظ بـ config.json لأنه يحتوي إعدادات الريأكشن (ليس أسرار)
+# src/data/autoReactions.json -> legacy, الآن نستخدم config.json
+*.log
+.DS_Store
+.vscode/
